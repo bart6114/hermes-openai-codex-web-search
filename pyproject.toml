@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-openai-codex-web-search"
+version = "1.0.0"
+description = "OpenAI Codex hosted web-search backend for Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+authors = [
+  {name = "Bart6114"},
+  {name = "Nous Research"},
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/bart6114/hermes-openai-codex-web-search"
+Repository = "https://github.com/bart6114/hermes-openai-codex-web-search"
+Issues = "https://github.com/bart6114/hermes-openai-codex-web-search/issues"
+
+[project.entry-points."hermes_agent.plugins"]
+web-openai-codex = "hermes_openai_codex_web_search"
+
+[tool.setuptools.packages.find]
+include = ["hermes_openai_codex_web_search*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

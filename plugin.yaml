@@ -1,0 +1,12 @@
+manifest_version: 2
+api_version: 1
+name: web-openai-codex
+version: 1.0.0
+description: "OpenAI Codex hosted web search using an existing ChatGPT/Codex sign-in."
+author: Bart6114 and Nous Research
+kind: backend
+license: MIT
+homepage: https://github.com/bart6114/hermes-openai-codex-web-search
+tags: [web-search, openai, codex, chatgpt]
+provides_web_providers:
+  - openai-codex
