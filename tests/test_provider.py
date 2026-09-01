@@ -1,4 +1,5 @@
 """Tests for the OpenAI Codex hosted web-search provider."""
+
 from __future__ import annotations
 
 import json
@@ -21,13 +22,7 @@ class TestOpenAICodexAvailability:
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         (tmp_path / "auth.json").write_text(
             json.dumps(
-                {
-                    "providers": {
-                        "openai-codex": {
-                            "tokens": {"access_token": "oauth-token"}
-                        }
-                    }
-                }
+                {"providers": {"openai-codex": {"tokens": {"access_token": "oauth-token"}}}}
             ),
             encoding="utf-8",
         )
@@ -39,13 +34,7 @@ class TestOpenAICodexAvailability:
     def test_available_from_credential_pool_without_refresh(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         (tmp_path / "auth.json").write_text(
-            json.dumps(
-                {
-                    "credential_pool": {
-                        "openai-codex": [{"access_token": "pool-token"}]
-                    }
-                }
-            ),
+            json.dumps({"credential_pool": {"openai-codex": [{"access_token": "pool-token"}]}}),
             encoding="utf-8",
         )
 
@@ -68,12 +57,13 @@ class TestOpenAICodexAvailability:
 class TestOpenAICodexConfig:
     def test_non_codex_main_model_is_not_sent_to_codex_endpoint(self, monkeypatch):
         from hermes_cli import config as config_module
+
         from hermes_openai_codex_web_search import provider as codex_provider
 
         monkeypatch.setattr(
             config_module,
             "load_config_readonly",
-            lambda: {
+            lambda *args: {
                 "model": {"provider": "anthropic", "default": "claude-opus-4-1"},
                 "web": {"search_backend": "openai-codex"},
             },
@@ -82,6 +72,75 @@ class TestOpenAICodexConfig:
         config = codex_provider._load_openai_codex_web_config()
 
         assert not config.get("model")
+
+    def test_plugin_owned_settings_override_legacy_settings(self, monkeypatch):
+        from hermes_cli import config as config_module
+
+        from hermes_openai_codex_web_search import provider as codex_provider
+
+        monkeypatch.setattr(
+            config_module,
+            "load_config_readonly",
+            lambda: {
+                "model": {"provider": "openai-codex", "default": "gpt-main"},
+                "web": {
+                    "openai_codex": {
+                        "model": "gpt-legacy",
+                        "mode": "cached",
+                    }
+                },
+            },
+        )
+        settings = {"model": "gpt-plugin", "context_size": "high"}
+
+        config = codex_provider._load_openai_codex_web_config(
+            lambda key, default=None: settings.get(key, default)
+        )
+
+        assert config == {
+            "model": "gpt-plugin",
+            "mode": "cached",
+            "context_size": "high",
+        }
+
+
+class TestCodexStreamAdapter:
+    def test_records_real_terminal_event_contract(self):
+        from hermes_openai_codex_web_search import provider as codex_provider
+
+        final = codex_provider._consume_codex_event_stream(
+            iter(
+                [
+                    {
+                        "type": "response.completed",
+                        "response": {"status": "completed", "output": []},
+                    }
+                ]
+            ),
+            model="gpt-5.6-sol",
+        )
+
+        assert final.status == "completed"
+        assert final.terminal_event_seen is True
+
+    def test_marks_truncated_partial_stream_as_non_terminal(self, monkeypatch):
+        from agent import codex_runtime
+
+        from hermes_openai_codex_web_search import provider as codex_provider
+
+        def consume(events, *, model, on_event, **kwargs):
+            for event in events:
+                on_event(event)
+            return SimpleNamespace(output=[{"type": "message"}], status="completed")
+
+        monkeypatch.setattr(codex_runtime, "_consume_codex_event_stream", consume)
+
+        final = codex_provider._consume_codex_event_stream(
+            iter([{"type": "response.output_text.delta", "delta": "partial"}]),
+            model="gpt-5.6-sol",
+        )
+
+        assert final.terminal_event_seen is False
 
 
 class _FakeResponses:
@@ -162,7 +221,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -196,7 +255,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "resolve_codex_runtime_credentials",
-            lambda: {
+            lambda *args: {
                 "api_key": "oauth-token",
                 "base_url": "https://chatgpt.com/backend-api/codex",
             },
@@ -205,7 +264,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {
+            lambda *args: {
                 "model": "gpt-5.6-sol-900k",
                 "timeout": 42,
                 "mode": "live",
@@ -269,7 +328,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
             raising=False,
         )
         monkeypatch.setattr(
@@ -304,7 +363,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -323,8 +382,7 @@ class TestOpenAICodexSearch:
 
         client = _FakeClient()
         final = _final_response(
-            '{"results":[{"title":"Partial","url":"https://example.com",'
-            '"description":"partial"}]}'
+            '{"results":[{"title":"Partial","url":"https://example.com","description":"partial"}]}'
         )
         final.status = "failed"
         final.error = {"message": "provider failed after partial output"}
@@ -336,7 +394,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -364,7 +422,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -397,7 +455,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(
             codex_provider,
@@ -444,7 +502,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -458,9 +516,7 @@ class TestOpenAICodexSearch:
 
         result = codex_provider.OpenAICodexWebSearchProvider().search("query")
 
-        assert [row["url"] for row in result["data"]["web"]] == [
-            "https://example.com/grounded"
-        ]
+        assert [row["url"] for row in result["data"]["web"]] == ["https://example.com/grounded"]
 
     def test_search_drops_non_http_urls_from_model_json(self, monkeypatch):
         from hermes_openai_codex_web_search import provider as codex_provider
@@ -482,7 +538,7 @@ class TestOpenAICodexSearch:
         monkeypatch.setattr(
             codex_provider,
             "_load_openai_codex_web_config",
-            lambda: {"model": "gpt-5.6-luna"},
+            lambda *args: {"model": "gpt-5.6-luna"},
         )
         monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
         monkeypatch.setattr(
@@ -491,11 +547,70 @@ class TestOpenAICodexSearch:
             lambda stream, **kwargs: _final_response(payload),
         )
 
-        result = codex_provider.OpenAICodexWebSearchProvider().search(
-            "query", limit=1
+        result = codex_provider.OpenAICodexWebSearchProvider().search("query", limit=1)
+
+        assert [row["url"] for row in result["data"]["web"]] == ["https://example.com/safe"]
+
+    def test_search_parses_embedded_json_and_removes_duplicate_urls(self, monkeypatch):
+        from hermes_openai_codex_web_search import provider as codex_provider
+
+        client = _FakeClient()
+        payload = (
+            'Preface {"meta": true} then '
+            '{"results":['
+            '{"title":"First","url":"https://example.com","description":"one"},'
+            '{"title":"Duplicate","url":"https://example.com","description":"two"}'
+            "]} trailing prose"
+        )
+        monkeypatch.setattr(
+            codex_provider,
+            "resolve_codex_runtime_credentials",
+            lambda: {"api_key": "token", "base_url": "https://chatgpt.com/backend-api/codex"},
+        )
+        monkeypatch.setattr(
+            codex_provider,
+            "_load_openai_codex_web_config",
+            lambda *args: {"model": "gpt-5.6-luna"},
+        )
+        monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
+        monkeypatch.setattr(
+            codex_provider,
+            "_consume_codex_event_stream",
+            lambda stream, **kwargs: _final_response(payload),
         )
 
-        assert [row["url"] for row in result["data"]["web"]] == [
-            "https://example.com/safe"
+        result = codex_provider.OpenAICodexWebSearchProvider().search("query")
+
+        assert result["data"]["web"] == [
+            {
+                "title": "First",
+                "url": "https://example.com",
+                "description": "one",
+                "position": 1,
+            }
         ]
 
+    def test_search_normalizes_non_finite_timeout(self, monkeypatch):
+        from hermes_openai_codex_web_search import provider as codex_provider
+
+        client = _FakeClient()
+        monkeypatch.setattr(
+            codex_provider,
+            "resolve_codex_runtime_credentials",
+            lambda: {"api_key": "token", "base_url": "https://chatgpt.com/backend-api/codex"},
+        )
+        monkeypatch.setattr(
+            codex_provider,
+            "_load_openai_codex_web_config",
+            lambda *args: {"model": "gpt-5.6-luna", "timeout": "nan"},
+        )
+        monkeypatch.setattr(codex_provider, "_create_codex_client", lambda **kwargs: client)
+        monkeypatch.setattr(
+            codex_provider,
+            "_consume_codex_event_stream",
+            lambda stream, **kwargs: _final_response('{"results": []}'),
+        )
+
+        codex_provider.OpenAICodexWebSearchProvider().search("query")
+
+        assert client.responses.kwargs["timeout"] == codex_provider.DEFAULT_TIMEOUT

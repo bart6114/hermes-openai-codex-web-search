@@ -1,10 +1,29 @@
 name: web-openai-codex
-version: 1.0.0
+version: 1.1.0
+manifest_version: 2
+api_version: 1
 description: "OpenAI Codex hosted web search using an existing ChatGPT/Codex sign-in."
 author: Bart6114 and Nous Research
 kind: backend
 license: MIT
 homepage: https://github.com/bart6114/hermes-openai-codex-web-search
-tags: [web-search, openai, codex, chatgpt]
+tags: [web-search, openai, codex, chatgpt, oauth]
 provides_web_providers:
   - openai-codex
+config_schema:
+  model:
+    type: str
+    default: ""
+    description: "Codex model used for hosted search; defaults to the active Codex model."
+  mode:
+    type: str
+    default: live
+    description: "Hosted search mode: live or cached."
+  context_size:
+    type: str
+    default: medium
+    description: "Hosted search context size: low, medium, or high."
+  timeout:
+    type: float
+    default: 90
+    description: "Positive request timeout in seconds."

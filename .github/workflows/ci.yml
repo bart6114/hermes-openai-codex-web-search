@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    name: Python ${{ matrix.python }} / Hermes ${{ matrix.hermes_label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.11"
+            hermes_ref: v2026.8.19
+            hermes_label: "0.20.5 (minimum)"
+          - python: "3.12"
+            hermes_ref: v2026.8.31
+            hermes_label: "0.21.0 (latest release)"
+          - python: "3.13"
+            hermes_ref: v2026.8.31
+            hermes_label: "0.21.0 (latest release)"
+          - python: "3.13"
+            hermes_ref: main
+            hermes_label: main
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: plugin
+
+      - name: Check out Hermes Agent
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NousResearch/hermes-agent
+          ref: ${{ matrix.hermes_ref }}
+          path: hermes-agent
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.8"
+          enable-cache: true
+
+      - name: Create test environment
+        run: |
+          uv venv .venv --python "${{ matrix.python }}"
+          uv pip install --python .venv/bin/python \
+            -e ./hermes-agent \
+            -e ./plugin \
+            build==1.3.0 \
+            pytest==9.1.1 \
+            ruff==0.15.10
+
+      - name: Run tests
+        run: .venv/bin/python -m pytest plugin/tests -q
+
+      - name: Run Plugin Doctor
+        run: .venv/bin/hermes plugins doctor plugin --ci
+
+      - name: Check style
+        run: |
+          .venv/bin/ruff check plugin
+          .venv/bin/ruff format --check plugin
+
+      - name: Build distributions
+        run: .venv/bin/python -m build plugin
