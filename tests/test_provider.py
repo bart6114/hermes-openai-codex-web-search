@@ -89,9 +89,16 @@ class TestOpenAICodexConfig:
                         "mode": "cached",
                     }
                 },
+                "plugins": {
+                    "entries": {
+                        "web-openai-codex": {
+                            "settings": {"model": "gpt-plugin"},
+                        }
+                    }
+                },
             },
         )
-        settings = {"model": "gpt-plugin", "context_size": "high"}
+        settings = {"context_size": "high"}
 
         config = codex_provider._load_openai_codex_web_config(
             lambda key, default=None: settings.get(key, default)

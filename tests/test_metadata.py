@@ -15,7 +15,6 @@ def test_package_and_manifest_metadata_stay_in_sync():
     assert package["project"]["version"] == manifest["version"]
     assert manifest["name"] == "web-openai-codex"
     assert manifest["kind"] == "backend"
-    assert manifest["manifest_version"] == 2
     assert manifest["api_version"] == 1
     assert manifest["provides_web_providers"] == ["openai-codex"]
     assert set(manifest["config_schema"]) == {

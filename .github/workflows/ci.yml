@@ -61,7 +61,11 @@ jobs:
             pytest==9.1.1 \
             ruff==0.15.10
 
-      - name: Run tests
+      - name: Run unit and real-runtime integration tests
+        env:
+          HERMES_HOME: ${{ runner.temp }}/hermes-plugin-tests
+          TZ: UTC
+          LANG: C.UTF-8
         run: .venv/bin/python -m pytest plugin/tests -q
 
       - name: Run Plugin Doctor

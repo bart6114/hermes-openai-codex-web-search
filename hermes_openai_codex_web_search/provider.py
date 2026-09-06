@@ -73,11 +73,24 @@ def _load_openai_codex_web_config(
     section = web.get("openai_codex") if isinstance(web, dict) else None
     result = dict(section) if isinstance(section, dict) else {}
 
-    # Current Hermes plugin standards keep behavior settings under the
-    # plugin's own namespace. The legacy web.openai_codex subtree remains a
-    # read-only fallback so existing installations continue to work.
+    # Hermes rejects the plugin-relative key "model" as a reserved core root,
+    # even inside this plugin's settings. Read only our own model leaf from the
+    # already-loaded, profile-scoped config; never ask ctx.get_config("model").
+    plugins = config.get("plugins")
+    entries = plugins.get("entries") if isinstance(plugins, dict) else None
+    entry = entries.get("web-openai-codex") if isinstance(entries, dict) else None
+    if isinstance(entry, dict):
+        for subtree in ("config", "settings"):
+            settings = entry.get(subtree)
+            if isinstance(settings, dict) and "model" in settings:
+                result["model"] = settings["model"]
+
+    # Other keys use the public plugin-relative API (settings, then config).
+    # web.openai_codex remains a read-only fallback for existing installations.
     if get_plugin_config is not None:
         for key in _PLUGIN_SETTING_KEYS:
+            if key == "model":
+                continue
             try:
                 value = get_plugin_config(key, _MISSING)
             except Exception as exc:

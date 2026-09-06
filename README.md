@@ -40,7 +40,9 @@ hermes config set plugins.entries.web-openai-codex.settings.timeout 90
 - `context_size`: `low`, `medium`, or `high`.
 - `timeout`: a positive number of seconds; invalid values fall back to 90.
 
-Version 1.x still reads the former `web.openai_codex` settings as a lower-priority compatibility fallback. New configuration should use the plugin-owned path above.
+Version 1.x still reads the former `web.openai_codex` settings as a lower-priority compatibility fallback. Plugin `settings` take precedence over the older `plugins.entries.web-openai-codex.config` subtree, which in turn takes precedence over `web.openai_codex`. If no non-empty model is selected, only a main model using the `openai-codex` provider is inherited. New configuration should use the plugin-owned path above.
+
+The documented `settings.model` key remains supported. Hermes reserves the relative key `model` in `PluginContext.get_config`, so this plugin reads its own model leaf from the active profile's read-only configuration instead. It does not rewrite configuration or access another plugin's settings.
 
 For a split setup, keep extraction on a provider that supports it:
 
@@ -78,6 +80,8 @@ hermes plugins doctor . --ci
 python -m pytest -q
 ruff check .
 ```
+
+The test suite includes a fresh Git installation into a temporary `HERMES_HOME`, followed by runtime validation. This catches installer compatibility failures that Plugin Doctor alone does not detect. Integration tests also exercise settings through the real Hermes `PluginContext`.
 
 ## Security and behavior
 

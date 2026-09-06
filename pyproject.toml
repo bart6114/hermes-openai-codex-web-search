@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-openai-codex-web-search"
-version = "1.1.0"
+version = "1.1.1"
 description = "OpenAI Codex hosted web-search backend for Hermes Agent"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
