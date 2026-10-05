@@ -154,12 +154,13 @@ def _consume_codex_event_stream(
 ) -> Any:
     from agent.codex_runtime import _consume_codex_event_stream as consume
 
-    terminal_event_seen = False
+    terminal_event_type = None
 
     def observe_event(event: Any) -> None:
-        nonlocal terminal_event_seen
-        if _item_get(event, "type") in _TERMINAL_EVENT_TYPES:
-            terminal_event_seen = True
+        nonlocal terminal_event_type
+        event_type = _item_get(event, "type")
+        if event_type in _TERMINAL_EVENT_TYPES:
+            terminal_event_type = event_type
 
     final = consume(
         stream,
@@ -170,7 +171,11 @@ def _consume_codex_event_stream(
     # Hermes's stream consumer deliberately does not expose whether it saw a
     # terminal frame when partial output exists. Record the observation here
     # so the provider can reject truncated-but-plausible output.
-    final.terminal_event_seen = terminal_event_seen
+    final.terminal_event_seen = terminal_event_type is not None
+    # A failed/incomplete frame must trump the consumer's default completed
+    # status, including malformed terminal payloads with no status field.
+    if terminal_event_type in {"response.failed", "response.incomplete"}:
+        final.status = terminal_event_type.removeprefix("response.")
     return final
 
 

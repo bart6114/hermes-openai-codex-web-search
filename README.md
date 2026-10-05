@@ -7,7 +7,7 @@ No separate search API key is required. Each search does make a bounded Codex mo
 ## Requirements
 
 - Hermes Agent 0.20.5 or newer; CI covers 0.20.5, the latest release, and current `main`
-- Python 3.11–3.13, matching Hermes
+- Python 3.11–3.14; current Hermes `main` runs on Python 3.14
 - An OpenAI Codex sign-in configured with `hermes auth add openai-codex`
 - An active OpenAI Codex model, or an explicit plugin model setting
 
@@ -19,6 +19,14 @@ hermes config set web.search_backend openai-codex
 ```
 
 Restart long-running Hermes or gateway processes after installation or updates so they rediscover the plugin.
+
+### Multiple profiles on managed-runtime Hermes
+
+Current Hermes can stage profile-local Python packages into one uv workspace. Installing this same packaged plugin in several profiles can produce a duplicate-package-name error and cause Hermes to disable those copies.
+
+For affected installations, keep the plugin as a dependency-free native directory plugin: rename `pyproject.toml` to `pyproject.distribution.toml` inside each installed `plugins/web-openai-codex` directory. Keep `plugin.yaml`, the root `__init__.py`, and the `hermes_openai_codex_web_search` package unchanged. Then re-enable `web-openai-codex` in each affected profile with `hermes --profile <name> plugins enable web-openai-codex`, run Plugin Doctor, and restart the gateway. The plugin uses libraries already supplied by Hermes; no package installation into the managed environment is needed.
+
+This is a workaround for Hermes workspace staging, not a change to the distribution's packaging. Recheck the installed layout after plugin updates, which may restore `pyproject.toml`.
 
 ## Configure
 

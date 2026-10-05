@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import platform
 import tomllib
 from pathlib import Path
 
 import yaml
+from packaging.specifiers import SpecifierSet
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,6 +25,12 @@ def test_package_and_manifest_metadata_stay_in_sync():
         "model",
         "timeout",
     }
+
+
+def test_package_supports_running_python():
+    package = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert platform.python_version() in SpecifierSet(package["project"]["requires-python"])
 
 
 def test_python_entry_point_targets_register_function():

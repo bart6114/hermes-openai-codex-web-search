@@ -7,7 +7,7 @@ name = "hermes-openai-codex-web-search"
 version = "1.1.1"
 description = "OpenAI Codex hosted web-search backend for Hermes Agent"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 license = "MIT"
 authors = [
   {name = "Bart6114"},
@@ -20,6 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 
 [project.urls]

@@ -28,7 +28,7 @@ jobs:
           - python: "3.13"
             hermes_ref: v2026.8.31
             hermes_label: "0.21.0 (latest release)"
-          - python: "3.13"
+          - python: "3.14"
             hermes_ref: main
             hermes_label: main
 
@@ -59,6 +59,7 @@ jobs:
             -e ./plugin \
             build==1.3.0 \
             pytest==9.1.1 \
+            PyYAML==6.0.3 \
             ruff==0.15.10
 
       - name: Run unit and real-runtime integration tests

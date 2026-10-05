@@ -20,6 +20,7 @@ def test_fresh_git_install_enables_plugin_in_isolated_home(tmp_path):
         source,
         ignore=shutil.ignore_patterns(
             ".git",
+            "artifacts",
             ".venv",
             "venv",
             "__pycache__",
@@ -57,8 +58,19 @@ def test_fresh_git_install_enables_plugin_in_isolated_home(tmp_path):
     }
     env.update(HOME=str(tmp_path), HERMES_HOME=str(home), TZ="UTC", LANG="C.UTF-8")
     command = [sys.executable, "-m", "hermes_cli.main"]
+    help_result = subprocess.run(
+        [*command, "plugins", "install", "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    # Current Hermes requires explicit dependency consent in noninteractive installs.
+    consent_flags = ["--yes-deps"] if "--yes-deps" in help_result.stdout else []
     install = subprocess.run(
-        [*command, "plugins", "install", source.as_uri(), "--enable"],
+        [*command, "plugins", "install", source.as_uri(), "--enable", *consent_flags],
         cwd=tmp_path,
         env=env,
         capture_output=True,
