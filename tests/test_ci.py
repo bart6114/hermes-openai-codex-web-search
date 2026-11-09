@@ -42,3 +42,18 @@ def test_ci_build_uses_uv_without_requiring_system_ensurepip():
     build = next(step["run"] for step in steps if step.get("name") == "Build distributions")
 
     assert "--installer uv" in build
+
+
+def test_ci_resolves_runner_temp_only_after_job_starts():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    job = workflow["jobs"]["compatibility"]
+
+    assert "runner." not in str(job.get("env", {}))
+    steps = job["steps"]
+    setup_index = next(i for i, step in enumerate(steps) if step.get("name") == "Set test home")
+    test_index = next(
+        i for i, step in enumerate(steps) if step.get("name") == "Create test environment"
+    )
+    assert setup_index < test_index
+    assert '"$RUNNER_TEMP"' in steps[setup_index]["run"]
+    assert '"$GITHUB_ENV"' in steps[setup_index]["run"]

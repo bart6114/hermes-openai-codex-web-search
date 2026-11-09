@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      HERMES_HOME: ${{ runner.temp }}/hermes-plugin-tests
       TZ: UTC
       LANG: C.UTF-8
     strategy:
@@ -57,6 +56,9 @@ jobs:
         with:
           version: "0.12.8"
           enable-cache: true
+
+      - name: Set test home
+        run: printf 'HERMES_HOME=%s/hermes-plugin-tests\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       - name: Create test environment
         run: |
