@@ -7,6 +7,21 @@ import pytest
 from hermes_openai_codex_web_search import provider as codex_provider
 
 
+def test_real_codex_client_and_auth_imports_without_live_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    from hermes_cli.auth import resolve_codex_runtime_credentials
+
+    assert callable(resolve_codex_runtime_credentials)
+    client = codex_provider._create_codex_client(
+        api_key="test-token", base_url="https://example.invalid/codex"
+    )
+    try:
+        assert callable(client.responses.create)
+        assert str(client.base_url).rstrip("/") == "https://example.invalid/codex"
+    finally:
+        client.close()
+
+
 @pytest.fixture
 def streamed_search(monkeypatch):
     monkeypatch.setattr(codex_provider, "_is_interrupted", lambda: False)

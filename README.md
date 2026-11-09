@@ -6,7 +6,7 @@ No separate search API key is required. Each search does make a bounded Codex mo
 
 ## Requirements
 
-- Hermes Agent 0.20.5 or newer; CI covers 0.20.5, the latest release, and current `main`
+- Hermes Agent 0.20.5 or newer; CI covers the minimum, legacy releases, the pinned current installed baseline (0.23.0), and current `main`
 - Python 3.11–3.14; current Hermes `main` runs on Python 3.14
 - An OpenAI Codex sign-in configured with `hermes auth add openai-codex`
 - An active OpenAI Codex model, or an explicit plugin model setting
@@ -24,9 +24,22 @@ Restart long-running Hermes or gateway processes after installation or updates s
 
 Current Hermes can stage profile-local Python packages into one uv workspace. Installing this same packaged plugin in several profiles can produce a duplicate-package-name error and cause Hermes to disable those copies.
 
-For affected installations, keep the plugin as a dependency-free native directory plugin: rename `pyproject.toml` to `pyproject.distribution.toml` inside each installed `plugins/web-openai-codex` directory. Keep `plugin.yaml`, the root `__init__.py`, and the `hermes_openai_codex_web_search` package unchanged. Then re-enable `web-openai-codex` in each affected profile with `hermes --profile <name> plugins enable web-openai-codex`, run Plugin Doctor, and restart the gateway. The plugin uses libraries already supplied by Hermes; no package installation into the managed environment is needed.
+For affected installations, keep the plugin as a dependency-free native directory plugin. For a **clean Git checkout**, sparse checkout can omit only the root packaging metadata without recording a tracked deletion:
 
-This is a workaround for Hermes workspace staging, not a change to the distribution's packaging. Recheck the installed layout after plugin updates, which may restore `pyproject.toml`.
+```bash
+# Set this to the affected profile's actual plugin directory.
+plugin_dir="${HERMES_HOME:-$HOME/.hermes}/plugins/web-openai-codex"
+git -C "$plugin_dir" status --short   # back up/reconcile local changes first
+# Run only once the tracked working tree is clean:
+git -C "$plugin_dir" sparse-checkout set --no-cone '/*' '!/pyproject.toml'
+git -C "$plugin_dir" status --short   # should remain clean
+```
+
+The `plugin.yaml`, root `__init__.py`, and provider package remain present. Git retains the exclusion across ordinary pulls, including changes to `pyproject.toml`; a reinstall/reclone or a tool that disables sparse checkout may restore it. To undo the exclusion, run `git -C "$plugin_dir" sparse-checkout disable`.
+
+The previous rename workaround (`pyproject.toml` → `pyproject.distribution.toml`) still works at runtime, but leaves a tracked deletion and can interfere with updates. If migrating, back up the renamed file and any other changes, reconcile with upstream, and restore the tracked metadata before applying sparse checkout. Do not discard local changes blindly.
+
+After changing the layout, re-enable `web-openai-codex` in each affected profile with `hermes --profile <name> plugins enable web-openai-codex`, run Plugin Doctor, and restart the gateway. The plugin uses libraries already supplied by Hermes; do not pip-install into the managed runtime. Recheck the layout after plugin updates. This is a workaround for Hermes workspace staging, not a change to the published distribution's packaging.
 
 ## Configure
 
@@ -59,19 +72,11 @@ hermes config set web.search_backend openai-codex
 hermes config set web.extract_backend firecrawl
 ```
 
-## Install as a Python entry-point plugin
+## Python entry-point packaging
 
-Install into the same Python environment as Hermes:
+The distribution exposes `web-openai-codex` in the `hermes_agent.plugins` entry-point group for independently managed Python environments. For normal Hermes installations, use `hermes plugins install` above instead of raw pip/uv commands or a hard-coded `venv/bin/python` path. Current Hermes owns its Python runtime through PM; the old source-install venv may no longer be the interpreter Hermes actually runs.
 
-```bash
-~/.hermes/bin/uv pip install \
-  --python ~/.hermes/hermes-agent/venv/bin/python \
-  "git+https://github.com/bart6114/hermes-openai-codex-web-search.git"
-hermes plugins enable web-openai-codex
-hermes config set web.search_backend openai-codex
-```
-
-The package exposes `web-openai-codex` in the `hermes_agent.plugins` entry-point group.
+See the official [installation guide](https://hermes-agent.nousresearch.com/docs/getting-started/installation) and [package-management reference](https://hermes-agent.nousresearch.com/docs/reference/package-management). The supported source/developer workflow is activation/PM; an independent full-core test environment can be built with `python -m pm.build_env --source . --out .venv --group dev --group test` from a prepared Hermes checkout (the output must not already exist). Never add this plugin's test tools to a production managed generation.
 
 ## Verify
 
@@ -81,15 +86,31 @@ hermes tools --summary
 hermes chat -q 'Use web_search to find the latest Hermes Agent release.'
 ```
 
-For source validation:
+For installed-plugin validation, run `hermes plugins doctor . --ci` from the plugin checkout.
+
+### Compatibility CI and local tests
+
+CI tests Python 3.11/minimum 0.20.5, Python 3.12–3.13/legacy 0.21.0, and Python 3.14 against both the current installed 0.23.0 baseline (`109fd8161a509db5a00942152ba48882e446e8b0`) and moving `main`. Update the pinned current baseline deliberately when upgrading; the weekly scheduled main job detects upstream contract drift. Every matrix job is required: no tests are skipped and failures are not allowed.
+
+These are **plugin contract environments, not full Hermes application installs**. CI resolves the explicit SDK/config/CLI/test dependencies in `requirements-ci.txt`, then installs the real Hermes and plugin source projects with `--no-deps`. This keeps unrelated browser/image/desktop dependencies out of this plugin's checks; for example, upstream's `browser-harness==0.1.13` requires `Pillow==12.3.0` while core pins `Pillow==13.0.0`. It does not override those pins or claim that a complete upstream installation is healthy. If an exercised Hermes import gains a dependency, add it explicitly rather than stubbing the module or skipping its test.
+
+To reproduce against a separately checked-out Hermes revision, from this plugin checkout:
 
 ```bash
-hermes plugins doctor . --ci
-python -m pytest -q
-ruff check .
+# Keep the test home outside the plugin checkout (Doctor stages a copy).
+export HERMES_HOME=/path/outside/plugin/checkout/hermes-test-home
+export TZ=UTC LANG=C.UTF-8
+uv venv .venv --python 3.14
+uv pip install --python .venv/bin/python -r requirements-ci.txt
+uv pip install --python .venv/bin/python --no-deps -e /path/to/hermes-agent -e .
+.venv/bin/python -m pytest tests -q
+.venv/bin/python -m hermes_cli.main plugins doctor . --ci
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/python -m build --installer uv
 ```
 
-The test suite includes a fresh Git installation into a temporary `HERMES_HOME`, followed by runtime validation. This catches installer compatibility failures that Plugin Doctor alone does not detect. Integration tests also exercise settings through the real Hermes `PluginContext`.
+Run these only in a disposable caller-owned venv, never the runtime printed by `hermes --print-runtime-command`. The suite includes a fresh Git installation into a temporary `HERMES_HOME`, followed by Plugin Doctor. It also exercises settings through the real `PluginContext`, the real Codex stream consumer, and actual SDK client construction/auth imports without network calls or live credentials. Thus the `--no-deps` boundary does not replace Hermes implementations with mocks; hosted search itself is not a credential-free CI test.
 
 ## Security and behavior
 

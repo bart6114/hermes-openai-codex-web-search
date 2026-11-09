@@ -15,6 +15,10 @@ jobs:
     name: Python ${{ matrix.python }} / Hermes ${{ matrix.hermes_label }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      HERMES_HOME: ${{ runner.temp }}/hermes-plugin-tests
+      TZ: UTC
+      LANG: C.UTF-8
     strategy:
       fail-fast: false
       matrix:
@@ -24,10 +28,13 @@ jobs:
             hermes_label: "0.20.5 (minimum)"
           - python: "3.12"
             hermes_ref: v2026.8.31
-            hermes_label: "0.21.0 (latest release)"
+            hermes_label: "0.21.0 (legacy release)"
           - python: "3.13"
             hermes_ref: v2026.8.31
-            hermes_label: "0.21.0 (latest release)"
+            hermes_label: "0.21.0 (legacy release)"
+          - python: "3.14"
+            hermes_ref: 109fd8161a509db5a00942152ba48882e446e8b0
+            hermes_label: "0.23.0 (current installed baseline)"
           - python: "3.14"
             hermes_ref: main
             hermes_label: main
@@ -54,19 +61,14 @@ jobs:
       - name: Create test environment
         run: |
           uv venv .venv --python "${{ matrix.python }}"
+          # This caller-owned venv tests plugin contracts, not a full Hermes install.
+          # Resolve its explicit dependencies normally; only the two source projects
+          # omit their unrelated application dependency graphs (see README).
+          uv pip install --python .venv/bin/python -r plugin/requirements-ci.txt
           uv pip install --python .venv/bin/python \
-            -e ./hermes-agent \
-            -e ./plugin \
-            build==1.3.0 \
-            pytest==9.1.1 \
-            PyYAML==6.0.3 \
-            ruff==0.15.10
+            --no-deps -e ./hermes-agent -e ./plugin
 
       - name: Run unit and real-runtime integration tests
-        env:
-          HERMES_HOME: ${{ runner.temp }}/hermes-plugin-tests
-          TZ: UTC
-          LANG: C.UTF-8
         run: .venv/bin/python -m pytest plugin/tests -q
 
       - name: Run Plugin Doctor
@@ -78,4 +80,4 @@ jobs:
           .venv/bin/ruff format --check plugin
 
       - name: Build distributions
-        run: .venv/bin/python -m build plugin
+        run: .venv/bin/python -m build --installer uv plugin
